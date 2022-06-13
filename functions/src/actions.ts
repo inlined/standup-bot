@@ -61,6 +61,7 @@ export async function removeFromSpace(event: chat.ChatEvent) {
 }
 
 const DISPATCH_TABLE: Array<[RegExp, (message: chat.Message) => Promise<string | void>]> = [
+  [/⬅️|👈|y(exterday)?:/, addStatusUpdate],
   [/^help/, handleHelp],
   [/^add/, handleAdd],
   [/^remove/, handleRemove],
@@ -69,7 +70,6 @@ const DISPATCH_TABLE: Array<[RegExp, (message: chat.Message) => Promise<string |
   [/^set/, handleSetProperty],
   [/^forgetme/, handleForgetMe],
   [/^forget me/, handleForgetMe],
-  [/👈|y(exterday)?:/, addStatusUpdate],
 ];
 
 export async function handleMessage(message: chat.Message, res: Response) {
@@ -83,6 +83,7 @@ export async function handleMessage(message: chat.Message, res: Response) {
       if (response) {
         res.json({text: response});
       }
+      return;
     }
     res.json({
       text: `Unknown command ${command}.\n${ux.STRINGS.helpCommands}`
