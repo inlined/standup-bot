@@ -13,7 +13,11 @@ export const handlechat = onRequest({
   const event = req.body as chat.ChatEvent;
   if (chat.isAddToSpaceSpaceEvent(event)) {
     await actions.addedToSpace(event);
-    if (!event.message?.argumentText) {
+    // The addToRoom text could very easily be mentioning the bot without a
+    // valid command. Add a little bit of smarts and reply with the welcome
+    // statement and not a command parsing error in this one case if there is
+    // no command
+    if (!actions.getAction(event.message?.argumentText || "")) {
       res.json({ text: "Hi, my name is Standup Bot\n" + ux.STRINGS.helpCommands });
       return;
     }

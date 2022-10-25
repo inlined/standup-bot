@@ -4,7 +4,7 @@ import { Room } from "./model";
 export const STRINGS = {
   helpCommands: "Valid commands are:\n" +
     "- help [command]?: display a list of valid commands\n" +
-    "- help standup: display syntax for recording stanups for snippet parsing\n" +
+    "- help standup: display syntax for recording standups for snippet parsing\n" +
     "- schedule <time>: schedule standup for a particular time\n" +
     "- unschedule: stop scheduling standups\n" +
     "- set timezone <tz>: set the time zone for standup\n" +

@@ -57,7 +57,7 @@ export interface Thread {
 export interface Space {
   name: string;
   type: "ROOM",
-  displayName: string;
+  displayName?: string;
   spaceThreadingState: "THREADED_MESSAGES";
   spaceType: "SPACE";
   spaceHistoryState: "HISTORY_ON";

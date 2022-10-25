@@ -26,29 +26,37 @@ function roomId(name: string) { return idNo(name, 0); }
 export async function addedToSpace(event: chat.AddToSpaceEvent) {
   const user = event.user;
   const db = getDatabase(app);
-  await Promise.all([
-    db.ref(`users/${userId(user.name)}`).update({
-      displayName: user.displayName,
-      email: user.email,
-      domainId: user.domainId,
-      spaces: {
-        [roomId(event.space.name)]: {
-          displayName: event.space.displayName,
-          spaceType: event.space.type,
-        },
-      }
-    }),
-
-    db.ref(`spaces/${roomId(event.space.name)}`).set({
-      type: event.space.type,
-      displayName: event.space.displayName,
-      spaceType: event.space.type,
-      invitedBy: userId(user.name),
-      users: {
-        [userId(user.name)]: user.email,
+  const room = roomId(event.space.name);
+  const userUpdate = {
+    displayName: user.displayName,
+    email: user.email,
+    domainId: user.domainId,
+    spaces: {
+      [room]: {
+        displayName: event.space.displayName,
+        spaceType: event.space.type,
       },
-    }),
+    }
+  }
+  if (!userUpdate.spaces[room].displayName) {
+    delete userUpdate.spaces[room].displayName;
+  }
+  const roomSettings = {
+    type: event.space.type,
+    displayName: event.space.displayName,
+    spaceType: event.space.type,
+    invitedBy: userId(user.name),
+    users: {
+      [userId(user.name)]: user.email,
+    },
+  };
+  if (!roomSettings.displayName) {
+    delete roomSettings.displayName;
+  }
 
+  await Promise.all([
+    db.ref(`users/${userId(user.name)}`).update(userUpdate),
+    db.ref(`spaces/${roomId(event.space.name)}`).set(roomSettings),
     schedule(roomId(event.space.name)),
   ]);
 }
@@ -60,7 +68,7 @@ export async function removeFromSpace(event: chat.ChatEvent) {
   // keep snippets after leaving a room.
 }
 
-const DISPATCH_TABLE: Array<[RegExp, (message: chat.Message) => Promise<string | void>]> = [
+export const DISPATCH_TABLE: Array<[RegExp, (message: chat.Message) => Promise<string | void>]> = [
   [/⬅️|👈|y(exterday)?:/, addStatusUpdate],
   [/^help/, handleHelp],
   [/^add/, handleAdd],
@@ -72,22 +80,31 @@ const DISPATCH_TABLE: Array<[RegExp, (message: chat.Message) => Promise<string |
   [/^forget me/, handleForgetMe],
 ];
 
+export function getAction(text: string): ((message: chat.Message) => Promise<string | void>) | null {
+  text = text.trim().toLowerCase();
+  for (const [pattern, strategy] of DISPATCH_TABLE) {
+    if (!text.match(pattern)) {
+      continue;
+    }
+    return strategy;
+  }
+  return null;
+}
+
 export async function handleMessage(message: chat.Message, res: Response) {
   try {
-    const command = message.argumentText.trim().toLowerCase();
-    for (const [pattern, strategy] of DISPATCH_TABLE) {
-      if (!command.match(pattern)) {
-        continue;
-      }
-      const response = await strategy(message);
-      if (response) {
-        res.json({text: response});
-      }
+    const action = getAction(message.argumentText);
+    if (!action) {
+      res.json({
+        text: `Unknown command ${message.argumentText}.\n${ux.STRINGS.helpCommands}`
+      });
       return;
     }
-    res.json({
-      text: `Unknown command ${command}.\n${ux.STRINGS.helpCommands}`
-    });
+    const response = await action(message);
+    if (response) {
+      res.json({text: response});
+    }
+    return;
   } catch (err: any) {
     logger.error("Unhandled exception:", JSON.stringify(err, null, 2));
     res.json({
@@ -148,10 +165,13 @@ export async function handleAdd(message: chat.Message) {
   }
   const db = getDatabase(app);
   const updates: Array<Promise<void>> = users.map(user => {
-    return db.ref(`users/${userId(user.name)}/spaces/${space}`).update({
-      displayName: message.space.displayName,
+    const update: Record<string, unknown> = {
       spaceType: message.space.type,
-    });
+    }
+    if (message.space.displayName) {
+      update.displayName = message.space.displayName;
+    }
+    return db.ref(`users/${userId(user.name)}/spaces/${space}`).update(update);
   });
   updates.push(db.ref(`spaces/${space}/users`).update(userMap));
   await Promise.all(updates);
